@@ -1,0 +1,26 @@
+{
+  "name": "agentic-sdlc-doc-sync",
+  "version": "1.0.0",
+  "description": "AI-Native Agentic SDLC – Automated Documentation Sync using GitHub Copilot",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --coverage",
+    "test:unit": "jest --testPathPattern=tests/unit",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:security": "jest --testPathPattern=tests/security",
+    "lint": "eslint src/ tests/",
+    "secret-scan": "tsx src/security/secret-scan-cli.ts",
+    "analyze-requirement": "tsx src/requirement/analyze-requirement-cli.ts"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.19.43",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0"
+  }
+}

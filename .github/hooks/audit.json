@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "node src/security/hooks/session-start.mjs",
+        "powershell": "node src/security/hooks/session-start.mjs",
+        "timeoutSec": 10
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "node src/security/hooks/audit-prompt.mjs",
+        "powershell": "node src/security/hooks/audit-prompt.mjs",
+        "timeoutSec": 10
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "node src/security/hooks/audit-error.mjs",
+        "powershell": "node src/security/hooks/audit-error.mjs",
+        "timeoutSec": 10
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "node src/security/hooks/session-end.mjs",
+        "powershell": "node src/security/hooks/session-end.mjs",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
+

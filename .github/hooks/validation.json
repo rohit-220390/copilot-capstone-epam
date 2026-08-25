@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "subagentStop": [
+      {
+        "type": "command",
+        "bash": "node src/security/hooks/subagent-stop.mjs",
+        "powershell": "node src/security/hooks/subagent-stop.mjs",
+        "timeoutSec": 15
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "node src/security/hooks/agent-stop.mjs",
+        "powershell": "node src/security/hooks/agent-stop.mjs",
+        "timeoutSec": 15
+      }
+    ]
+  }
+}
+
+
