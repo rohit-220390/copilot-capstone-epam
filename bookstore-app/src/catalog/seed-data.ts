@@ -16,6 +16,7 @@ interface SeedBookRecord {
   language: BookLanguage;
   daysAgoOffset: number;
   averageRating: number;
+  price: number;
 }
 
 // Read as plain JSON (not a static ESM import) so it works uniformly under tsx, ts-jest, and plain
@@ -27,8 +28,9 @@ const seedRecords = JSON.parse(
 
 /**
  * In-memory catalog fixture (see docs/design-review.md DR-004), sourced from `seed-data.json`.
- * Covers both categories, every format/language, and a spread of publication dates/ratings so
- * each filter dimension has at least one matching and one excluded book.
+ * Covers both categories, every format/language, and a spread of publication dates/ratings/prices so
+ * each filter and sort dimension has at least one matching and one excluded book. Includes books with
+ * identical prices (f1, nf4, nf11: $24.99; f4, nf2: $19.99) for stable-sort testing per DR-015.
  */
 export const seedBooks: Book[] = seedRecords.map((record) => ({
   id: record.id,
@@ -38,4 +40,5 @@ export const seedBooks: Book[] = seedRecords.map((record) => ({
   language: record.language,
   publicationDate: daysAgo(record.daysAgoOffset),
   averageRating: record.averageRating,
+  price: record.price,
 }));

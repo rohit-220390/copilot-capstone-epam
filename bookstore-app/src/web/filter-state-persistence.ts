@@ -1,5 +1,5 @@
 import type { BookCategory } from '../catalog/book.js';
-import { getFilterOptions } from '../catalog/filter-catalog.js';
+import { getFilterOptions, getSortOptions } from '../catalog/filter-catalog.js';
 import type { SelectedFilters } from './search-filters-panel.js';
 
 /** Persists a category's selected filters across a page refresh and restores them on load. */
@@ -16,9 +16,10 @@ export interface StorageLike {
 
 const STORAGE_KEY_PREFIX = 'bookstore-app:filters:';
 
-/** Drops any restored values no longer present in the current Filter Option Catalog (DR-010). */
+/** Drops any restored values no longer present in the current Filter Option Catalog or Sort Option Catalog (DR-010, TASK-020). */
 function sanitizeFilters(category: BookCategory, filters: SelectedFilters): SelectedFilters {
   const options = getFilterOptions(category);
+  const sortOptions = getSortOptions(category);
   const sanitized: SelectedFilters = {};
 
   if (filters.format !== undefined && (options.format as string[]).includes(filters.format)) {
@@ -32,6 +33,9 @@ function sanitizeFilters(category: BookCategory, filters: SelectedFilters): Sele
   }
   if (filters.minRating !== undefined && (options.minRating as number[]).includes(filters.minRating)) {
     sanitized.minRating = filters.minRating;
+  }
+  if (filters.sort !== undefined && sortOptions.includes(filters.sort)) {
+    sanitized.sort = filters.sort;
   }
 
   return sanitized;

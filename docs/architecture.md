@@ -110,3 +110,99 @@ Since no separate bookstore-application repository exists yet, and per product d
   Page refresh ──▶ new SearchFiltersPanel instance ──▶ FilterStatePort.load(category) ──▶ same filters restored ──▶ ResultsView.refresh()
   ```
 - Assumption: persistence is scoped per `category` (Fiction and Non‑Fiction keep independent saved filter state), consistent with filters already being category-scoped elsewhere in this design.
+
+### 11. Additional Scenario — Filtering works with sorting
+
+> Traces to the "Scenario: Filtering works with sorting" acceptance criterion added to `EPMCDMETST-52015` in [docs/requirements.md](./requirements.md).
+
+**Requirement Summary**
+- Sorting options must maintain parity with Fiction and Non-Fiction categories
+- Execution order: **Filter first, then sort** (confirmed by product owner)
+- Applied filters remain active when sorting is selected
+- Known sorting option: "price (high to low)"
+- Additional sorting options inferred from Fiction category for complete parity
+
+**Data Model Extension**
+- The `Book` interface must be extended with a `price: number` field representing the book's price in the base currency
+- Seed data (`seed-data.json`) must include price values for all books to support sorting tests
+- Migration note: existing filtering tests remain unaffected since price is optional for filter-only queries
+
+**Sorting Option Catalog**
+- New `SortOption` type: Union of supported sorting values
+- Initial supported options (maintaining Fiction/Non-Fiction parity):
+  - `'price-high-to-low'` — Sort by price descending (confirmed by product owner)
+  - `'price-low-to-high'` — Sort by price ascending (inferred for complete sorting coverage)
+  - `'rating-high-to-low'` — Sort by averageRating descending (common e-commerce pattern)
+  - `'publication-date-newest'` — Sort by publicationDate descending (newest first)
+  - `'publication-date-oldest'` — Sort by publicationDate ascending (oldest first)
+  - `'relevance'` — Default/no explicit sort (catalog order)
+- Sorting options declared in the same category-keyed config structure as filters, ensuring Fiction and Non-Fiction share identical options
+- Server-side validation: unrecognized sort values default to `'relevance'` rather than causing request failure
+
+**Component Architecture Changes**
+
+| Component | Changes | New Interfaces |
+|---|---|---|
+| `Book` model | Add `price: number` field | `Book.price` |
+| Sort Option Catalog | New config declaring available sort options per category | `getSortOptions(category): SortOption[]` |
+| `SearchFiltersPanel` | Add `selectSort(option: SortOption)` method; track selected sort in state | `SelectedFilters.sort?: SortOption` |
+| Search Query Builder | Apply sorting **after** filtering, before pagination | `sortBooks(filtered: Book[], sort: SortOption): Book[]` |
+| Search API | Accept `sort` query parameter; validate against catalog | `GET /api/search?...&sort=price-high-to-low` |
+| Filter State Persistence | Include `sort` in persisted state; restore on page load | `SelectedFilters` includes `sort` |
+| `ResultsView` | No changes (treats sort like any other filter) | — |
+
+**Data Flow**
+```
+User selects sort option
+        │
+        ▼
+SearchFiltersPanel.selectSort(option) ── emits updated filters+sort ──▶ Search Query Builder
+                                                                              │
+                                                                              ▼
+                                                                   Search API / Query Service
+                                                                              │
+                                                                              ▼
+                                                                   1. Apply filters (category, format, language, etc.)
+                                                                   2. Sort filtered results by selected option
+                                                                   3. Paginate sorted results
+                                                                              │
+                                                                              ▼
+                                                                   Return sorted, paginated results
+```
+
+**Execution Order** (confirmed by product owner)
+1. **Filter**: Apply category, format, language, publicationDate, minRating filters to catalog
+2. **Sort**: Sort the filtered result set by selected sort option
+3. **Paginate**: Slice sorted results by page/limit
+
+This order ensures:
+- Sorting operates on the narrowed result set (not the full catalog)
+- Page 1 shows the top-sorted items from the filtered set
+- Changing sort **does not** clear applied filters (AC requirement)
+
+**Sorting Algorithm**
+- `price-high-to-low`: `(a, b) => b.price - a.price`
+- `price-low-to-high`: `(a, b) => a.price - b.price`
+- `rating-high-to-low`: `(a, b) => b.averageRating - a.averageRating`
+- `publication-date-newest`: `(a, b) => new Date(b.publicationDate).getTime() - new Date(a.publicationDate).getTime()`
+- `publication-date-oldest`: `(a, b) => new Date(a.publicationDate).getTime() - new Date(b.publicationDate).getTime()`
+- `relevance`: no sorting applied (catalog order preserved)
+- Stable sort: Books with equal sort-key values maintain their relative catalog order
+
+**UI Integration**
+- Sort selector rendered as a dropdown/radio group in the same panel as filters (or adjacent to it)
+- Selecting a sort option triggers the same `onChange` flow as filter selection
+- Sort state persisted via `FilterStatePort` alongside filter selections
+- Clear All Filters action also resets sort to `'relevance'` (default)
+
+**Security & Validation**
+- Sort parameter validated server-side against the category's Sort Option Catalog
+- Unrecognized sort values default to `'relevance'` (graceful degradation, no request failure)
+- No additional security concerns: sorting does not expose restricted data or bypass authorization
+
+**Assumptions & Constraints**
+- Sorting is **always** applied after filtering (never before)
+- Only one sort option active at a time (no multi-column sort)
+- Sort state is independent of filter state but both are persisted together as a single `SelectedFilters` snapshot
+- Price values in seed data are realistic (positive numbers); no currency conversion logic needed for this iteration
+- Changing sort **resets page to 1** (same behavior as changing a filter)

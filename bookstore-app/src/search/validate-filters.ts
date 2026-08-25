@@ -1,5 +1,11 @@
 import type { BookCategory, BookFormat, BookLanguage } from '../catalog/book.js';
-import { getFilterOptions, type MinRating, type PublicationDateWindow } from '../catalog/filter-catalog.js';
+import {
+  getFilterOptions,
+  getSortOptions,
+  type MinRating,
+  type PublicationDateWindow,
+  type SortOption,
+} from '../catalog/filter-catalog.js';
 
 /** Raw, untrusted query-string values as received over HTTP. */
 export interface RawSearchFilters {
@@ -8,6 +14,7 @@ export interface RawSearchFilters {
   language?: string;
   publicationDate?: string;
   minRating?: string;
+  sort?: string;
 }
 
 export interface ValidatedSearchFilters {
@@ -16,6 +23,7 @@ export interface ValidatedSearchFilters {
   language?: BookLanguage;
   publicationDate?: PublicationDateWindow;
   minRating?: MinRating;
+  sort?: SortOption;
 }
 
 const VALID_CATEGORIES: BookCategory[] = ['fiction', 'non-fiction'];
@@ -31,10 +39,12 @@ function parseCategory(raw: string): BookCategory {
 /**
  * Validates raw query filters against the category's Filter Option Catalog allow-list.
  * Unrecognized optional filter values are dropped (ignored) rather than causing a request failure.
+ * Sort validation defaults to 'relevance' for unrecognized values (per DR-014).
  */
 export function validateFilters(raw: RawSearchFilters): ValidatedSearchFilters {
   const category = parseCategory(raw.category);
   const options = getFilterOptions(category);
+  const sortOptions = getSortOptions(category);
 
   const result: ValidatedSearchFilters = { category };
 
@@ -52,6 +62,12 @@ export function validateFilters(raw: RawSearchFilters): ValidatedSearchFilters {
     if ((options.minRating as number[]).includes(parsed)) {
       result.minRating = parsed as MinRating;
     }
+  }
+  // Sort validation: defaults to 'relevance' for unrecognized values (graceful degradation per DR-014)
+  if (raw.sort && sortOptions.includes(raw.sort as SortOption)) {
+    result.sort = raw.sort as SortOption;
+  } else if (raw.sort) {
+    result.sort = 'relevance'; // Default for invalid sort values
   }
 
   return result;

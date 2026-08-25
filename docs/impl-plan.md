@@ -10,7 +10,7 @@ This document contains the dependency-ordered implementation tasks.
 
 ### Overview
 
-Implements the approved architecture ([docs/architecture.md](./architecture.md)) and design review ([docs/design-review.md](./design-review.md)) for requirement `EPMCDMETST-52015`. Builds a new, self-contained application under `bookstore-app/` (independent of this repo's own SDLC-pipeline `src/`/`tests/`) providing a `GET /api/search` endpoint and minimal UI that let both Fiction and Non‑Fiction categories filter by Book Format, Language, Publication Date, and Customer Reviews through shared components/config, with an in-memory seeded catalog (per approved DR-004). Also implements the two additional scenarios added to the requirement afterward — Clear All Filters and filter-state persistence across a page refresh — per architecture.md Section 10 and design-review.md DR-008/DR-009/DR-010.
+Implements the approved architecture ([docs/architecture.md](./architecture.md)) and design review ([docs/design-review.md](./design-review.md)) for requirement `EPMCDMETST-52015`. Builds a new, self-contained application under `bookstore-app/` (independent of this repo's own SDLC-pipeline `src/`/`tests/`) providing a `GET /api/search` endpoint and minimal UI that let both Fiction and Non‑Fiction categories filter by Book Format, Language, Publication Date, and Customer Reviews through shared components/config, with an in-memory seeded catalog (per approved DR-004). Also implements three additional scenarios added to the requirement: (1) Clear All Filters, (2) filter-state persistence across page refresh (per architecture.md Section 10 and design-review.md DR-008/DR-009/DR-010), and (3) Filtering works with sorting (per architecture.md Section 11 and design-review.md DR-011 through DR-019), where sort options maintain parity with Fiction/Non-Fiction, execution order is Filter → Sort → Paginate, and applied filters remain active when sorting is selected.
 
 ### Task List
 
@@ -126,6 +126,86 @@ Implements the approved architecture ([docs/architecture.md](./architecture.md))
 - **Complexity**: Low
 - **Files**: `bookstore-app/tests/acceptance/non-fiction-filters.test.ts`
 
+### TASK-015: Extend Book model with price field
+- **Dependencies**: TASK-002
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting; resolves DR-011)
+- **Description**: Add `price: number` field to the `Book` interface. Update seed data generation to include realistic price values ($5.00-$50.00 range, up to 2 decimal places) for all books, including at least two books with identical prices (for stable-sort testing per DR-015).
+- **Acceptance Criteria**: Unit tests confirm all seed books have valid price values (positive numbers); at least two books have identical prices; existing filter tests remain passing (price doesn't affect filtering).
+- **Complexity**: Low
+- **Files**: `bookstore-app/src/catalog/book.ts`, `bookstore-app/src/catalog/seed-data.ts` (or `.json`), `bookstore-app/tests/catalog/seed-data.test.ts`
+
+### TASK-016: Define SortOption type and Sort Option Catalog
+- **Dependencies**: TASK-002
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting; resolves DR-012)
+- **Description**: Define `SortOption` type as union: `'price-high-to-low' | 'price-low-to-high' | 'rating-high-to-low' | 'publication-date-newest' | 'publication-date-oldest' | 'relevance'`. Add `getSortOptions(category): SortOption[]` function returning identical options for both Fiction and Non-Fiction (parity requirement).
+- **Acceptance Criteria**: Unit tests confirm `getSortOptions('fiction')` === `getSortOptions('non-fiction')` (proves parity AC); all six sort options are available.
+- **Complexity**: Low
+- **Files**: `bookstore-app/src/catalog/filter-catalog.ts` (extend existing), `bookstore-app/tests/catalog/filter-catalog.test.ts`
+
+### TASK-017: Implement sorting in Search Query Builder
+- **Dependencies**: TASK-006, TASK-015, TASK-016
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting; resolves DR-013, DR-015)
+- **Description**: Extend `searchBooks()` to apply sorting **after** filtering and **before** pagination (execution order: Filter → Sort → Paginate, per DR-013). Implement sorting algorithms for each `SortOption` value. Use ES2019+ stable `Array.sort()` (guaranteed stable in Node 12+) per DR-015. Unrecognized sort values default to `'relevance'` (no sorting).
+- **Acceptance Criteria**: Unit tests cover: each sort option individually (price-high-to-low, price-low-to-high, rating-high-to-low, etc.), sorting on a filtered result set (not full catalog), stable sort with identical sort-key values (two books with same price maintain catalog order), invalid sort value defaults to relevance, and consistent behavior across fiction/non-fiction categories.
+- **Complexity**: Medium
+- **Files**: `bookstore-app/src/search/query-builder.ts`, `bookstore-app/tests/search/query-builder.test.ts`
+
+### TASK-018: Update SearchFiltersPanel with selectSort method
+- **Dependencies**: TASK-008, TASK-016
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting; resolves DR-018)
+- **Description**: Add `selectSort(option: SortOption)` method to `SearchFiltersPanel`; track `sort` in `SelectedFilters` state. Emit through the same `onChange` mechanism as filter selections. Render sort selector as a dropdown/radio group (framework-agnostic approach, no DOM dependency).
+- **Acceptance Criteria**: Component tests confirm: selecting a sort option emits an `onChange` with updated `SelectedFilters` including the `sort` field; only one sort option active at a time; sort state is independent of filter state but emitted together.
+- **Complexity**: Low
+- **Files**: `bookstore-app/src/web/search-filters-panel.ts`, `bookstore-app/tests/web/search-filters-panel.test.ts`
+
+### TASK-019: Update API endpoint to handle sort parameter
+- **Dependencies**: TASK-007, TASK-017
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting; resolves DR-014)
+- **Description**: Extend `GET /api/search` to accept `?sort=<SortOption>` query parameter. Validate sort value against Sort Option Catalog; unrecognized values default to `'relevance'` (no 400 error). Pass validated sort to `searchBooks()`.
+- **Acceptance Criteria**: Integration tests confirm: valid sort values return sorted results, invalid sort values return unsorted (relevance) results without error, combined filters + sort applies in correct order (Filter → Sort → Paginate per DR-013).
+- **Complexity**: Medium
+- **Files**: `bookstore-app/src/api/search-endpoint.ts`, `bookstore-app/tests/api/search-endpoint.test.ts`
+
+### TASK-020: Update FilterStatePort to persist sort
+- **Dependencies**: TASK-012, TASK-016
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting; resolves DR-017)
+- **Description**: Extend `SelectedFilters` interface to include `sort?: SortOption`. Update `FilterStatePort.save()` and `load()` to persist/restore sort alongside filters. `load()` must validate restored sort value against `getSortOptions(category)` and drop if no longer valid (same pattern as filter validation per DR-010).
+- **Acceptance Criteria**: Unit tests confirm: save/load round-trip includes sort value, restored sort value not in current catalog is dropped, Clear All Filters also clears persisted sort (resetting to undefined/relevance per DR-017 approval).
+- **Complexity**: Low
+- **Files**: `bookstore-app/src/web/filter-state-persistence.ts`, `bookstore-app/tests/web/filter-state-persistence.test.ts`
+
+### TASK-021: Update ResultsView to handle sort + page reset
+- **Dependencies**: TASK-009, TASK-018, TASK-019
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting; resolves DR-019)
+- **Description**: Verify existing `ResultsView.onChange` listener already resets page to 1 on any `SelectedFilters` change (including sort). No additional reset logic needed since sort is part of `SelectedFilters`. Document this behavior explicitly.
+- **Acceptance Criteria**: Integration test confirms: page=2 + change sort → results from page=1; applied filters remain active when sort changes (AC requirement).
+- **Complexity**: Low
+- **Files**: `bookstore-app/src/web/results-view.ts`, `bookstore-app/tests/web/results-view.test.ts`
+
+### TASK-022: Update clearAll to reset sort to relevance
+- **Dependencies**: TASK-011, TASK-018
+- **Requirement**: EPMCDMETST-52015 (Scenario: Clear all filters; resolves DR-017)
+- **Description**: Update `clearAll()` method to reset `sort` to `undefined` (or explicitly `'relevance'`) in addition to clearing filters, maintaining the same `onChange` emission path.
+- **Acceptance Criteria**: Unit test asserts `clearAll()` after selections (filters + sort) emits an `onChange` with empty filters and undefined/relevance sort.
+- **Complexity**: Low
+- **Files**: `bookstore-app/src/web/search-filters-panel.ts`, `bookstore-app/tests/web/search-filters-panel.test.ts`
+
+### TASK-023: Wire sort persistence into results flow
+- **Dependencies**: TASK-013, TASK-020, TASK-022
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting + Filter state is preserved)
+- **Description**: Verify `FilterStatePort.save(category, filters)` (from TASK-013) already saves sort since it's part of `SelectedFilters`. On hydration from `load()`, sort is restored alongside filters.
+- **Acceptance Criteria**: Integration test: apply filters + sort, simulate refresh, confirm both filters and sort are restored; Clear All Filters + refresh confirms neither filters nor sort reappear.
+- **Complexity**: Low
+- **Files**: `bookstore-app/src/web/results-view.ts`, `bookstore-app/tests/web/results-view.test.ts`
+
+### TASK-024: Acceptance test for "Filtering works with sorting" scenario
+- **Dependencies**: TASK-014, TASK-021, TASK-023
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Add Gherkin-mapped scenario to acceptance suite: apply filters to Non-Fiction results, select a sort option (price-high-to-low), verify filtered results are sorted correctly and applied filters remain active.
+- **Acceptance Criteria**: New scenario passes; no regression to the original eight scenarios or to Fiction filtering; sorting + filtering parity between Fiction and Non-Fiction confirmed.
+- **Complexity**: Low
+- **Files**: `bookstore-app/tests/acceptance/non-fiction-filters.test.ts`
+
 ### Dependency Graph
 
 ```
@@ -137,36 +217,62 @@ TASK-002 (Book model + Filter Catalog)
    ├──▶ TASK-003 (seed data) ─────────┐
    ├──▶ TASK-004 (filter validation) ─┤
    ├──▶ TASK-005 (relative date) ─────┤
+   ├──▶ TASK-015 (add price field) ───┤
+   ├──▶ TASK-016 (Sort Option Catalog)┤
    │                                  ▼
    │                          TASK-006 (query builder + pagination)
    │                                  │
-   │                                  ▼
+   │                                  ├──▶ TASK-017 (add sorting to query builder)
+   │                                  │         │
+   │                                  ▼         │
    │                          TASK-007 (GET /api/search)
-   │                                  │
-   ├──▶ TASK-008 (SearchFiltersPanel) │
-   │                │                 │
-   │                ▼                 │
-   │        TASK-011 (clearAll())     │
-   │                │                 │
-   ├──▶ TASK-012 (FilterStatePort)    │
-   │                │                 │
-   │                └────────┬────────┘
+   │                                  │         │
+   │                                  │    TASK-019 (add sort param to API)
+   │                                  │         │
+   ├──▶ TASK-008 (SearchFiltersPanel) │         │
+   │                │                 │         │
+   │                │            TASK-018 (add selectSort to panel)
+   │                │                 │         │
+   │                ▼                 │         │
+   │        TASK-011 (clearAll())     │         │
+   │                │                 │         │
+   │        TASK-022 (clearAll resets sort)     │
+   │                │                 │         │
+   ├──▶ TASK-012 (FilterStatePort)    │         │
+   │                │                 │         │
+   │        TASK-020 (persist sort)   │         │
+   │                │                 │         │
+   │                └────────┬────────┴─────────┘
    │                         ▼
    │                TASK-009 (wire UI ↔ API)
+   │                         │
+   │                         ▼
+   │                TASK-021 (handle sort + page reset)
    │                         │
    │                         ▼
    │                TASK-013 (wire persistence + Clear All)
    │                         │
    │                         ▼
+   │                TASK-023 (wire sort persistence)
+   │                         │
+   │                         ▼
    │                TASK-014 (new-scenario acceptance tests)
+   │                         │
+   │                         ▼
+   │                TASK-024 (sorting acceptance test)
    ▼
 TASK-010 (original six acceptance tests)
 ```
 
 ### Risks and Blockers
 
-- **No human-facing UI framework decided**: TASK-008/009 assume a minimal vanilla TS/DOM implementation (no React/Vue dependency) to keep `bookstore-app/` lightweight and portable; flag if a specific framework is actually desired before TASK-008 starts.
+- **No human-facing UI framework decided**: TASK-008/009/018 assume a minimal vanilla TS/DOM implementation (no React/Vue dependency) to keep `bookstore-app/` lightweight and portable; flag if a specific framework is actually desired before TASK-008 starts.
 - **In-memory catalog (DR-004)** means data doesn't persist across process restarts — acceptable for capstone scope but should be called out in `bookstore-app/README.md` as a known limitation (handled in TEST/PR phase, not blocking implementation).
 - **Star-rating control semantics (architecture §8)**: clicking the same active star again (deselect) is not specified in the requirement — implementation should treat it as a no-op (stays selected) unless clarified otherwise; flagged for confirmation during code review rather than blocking planning.
-- **`localStorage` unavailability (TASK-012)**: the browser `FilterStatePort` adapter must degrade gracefully (no-op save/load, not throw) if `localStorage` is unavailable (e.g., private browsing mode), so filter persistence failing never breaks core filtering/search.
-- **DR-008 enforcement is structural, not just documented**: TASK-011/TASK-013 must route `clearAll()` through the exact same `onChange` → `save()` path as every other selection — do not implement a separate "reset" code path during TASK-011, or the DR-008 guarantee is void.
+- **`localStorage` unavailability (TASK-012/020)**: the browser `FilterStatePort` adapter must degrade gracefully (no-op save/load, not throw) if `localStorage` is unavailable (e.g., private browsing mode), so filter/sort persistence failing never breaks core filtering/search.
+- **DR-008 enforcement is structural, not just documented**: TASK-011/TASK-013/TASK-022 must route `clearAll()` through the exact same `onChange` → `save()` path as every other selection — do not implement a separate "reset" code path during TASK-011/022, or the DR-008 guarantee is void.
+- **Sorting execution order (DR-013)** is critical: TASK-017 must implement Filter → Sort → Paginate in that exact sequence. Any reordering breaks the AC "applied filters remain active when sorting."
+- **Price field addition (DR-011)** approved by product owner: TASK-015 adds `price: number` to Book model. Existing filter tests must remain passing (price doesn't affect filtering, only sorting).
+- **Clear All Filters clears sort (DR-017)** approved by product owner: TASK-022 resets sort to undefined/relevance alongside clearing filters. This interpretation is confirmed; no separate sort persistence needed.
+- **Stable sort requirement (DR-015)**: TASK-017 relies on ES2019+ stable `Array.sort()`. Verify Node version >= 12 in `bookstore-app/package.json` engines field; TypeScript target should be ES2019+ in tsconfig.json.
+- **Sort option parity (DR-012)**: Fiction and Non-Fiction must have identical sort options. TASK-016 uses the same shared-catalog pattern as filters; test coverage required per DR-012 acceptance criteria.

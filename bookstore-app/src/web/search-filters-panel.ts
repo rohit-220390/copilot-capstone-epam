@@ -1,11 +1,19 @@
 import type { BookCategory, BookFormat, BookLanguage } from '../catalog/book.js';
-import { getFilterOptions, type FilterOptions, type MinRating, type PublicationDateWindow } from '../catalog/filter-catalog.js';
+import {
+  getFilterOptions,
+  getSortOptions,
+  type FilterOptions,
+  type MinRating,
+  type PublicationDateWindow,
+  type SortOption,
+} from '../catalog/filter-catalog.js';
 
 export interface SelectedFilters {
   format?: BookFormat;
   language?: BookLanguage;
   publicationDate?: PublicationDateWindow;
   minRating?: MinRating;
+  sort?: SortOption;
 }
 
 export type FilterChangeListener = (filters: SelectedFilters) => void;
@@ -28,6 +36,10 @@ export class SearchFiltersPanel {
 
   getOptions(): FilterOptions {
     return getFilterOptions(this.category);
+  }
+
+  getSortOptions(): SortOption[] {
+    return getSortOptions(this.category);
   }
 
   onChange(listener: FilterChangeListener): void {
@@ -61,7 +73,13 @@ export class SearchFiltersPanel {
     this.emitChange();
   }
 
-  /** Resets all selections via the same emitChange() path as every other setter (DR-008: no bypass, so persistence stays in sync). */
+  /** Selects a sort option; emits through the same onChange path as filter selections. */
+  selectSort(option: SortOption): void {
+    this.selected.sort = option;
+    this.emitChange();
+  }
+
+  /** Resets all selections including sort via the same emitChange() path as every other setter (DR-008: no bypass, so persistence stays in sync). */
   clearAll(): void {
     this.selected = {};
     this.emitChange();

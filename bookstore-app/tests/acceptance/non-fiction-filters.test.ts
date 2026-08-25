@@ -70,6 +70,7 @@ describe('EPMCDMETST-52015 acceptance criteria', () => {
       language: filters.language,
       publicationDate: filters.publicationDate,
       minRating: filters.minRating !== undefined ? String(filters.minRating) : undefined,
+      sort: filters.sort,
       page: String(page),
     });
     if (response.status !== 200) throw new Error(response.body.error);
@@ -109,5 +110,37 @@ describe('EPMCDMETST-52015 acceptance criteria', () => {
 
     expect(refreshedPanel.getSelectedFilters()).toEqual({ format: 'hardcover' });
     expect(refreshedView.getItems().every((b) => b.format === 'hardcover')).toBe(true);
+  });
+
+  it('Scenario: Filtering works with sorting (TASK-024)', async () => {
+    // Apply filter to Non-Fiction results
+    const response = handleSearchRequest(seedBooks, {
+      category: 'non-fiction',
+      format: 'ebook',
+      sort: 'price-high-to-low',
+    });
+    
+    expect(response.status).toBe(200);
+    if (response.status === 200) {
+      // Verify filtered results (only ebooks)
+      expect(response.body.items.length).toBeGreaterThan(0);
+      expect(response.body.items.every((b) => b.format === 'ebook' && b.category === 'non-fiction')).toBe(true);
+      
+      // Verify sorting (price high to low within filtered ebooks)
+      for (let i = 1; i < response.body.items.length; i++) {
+        expect(response.body.items[i - 1].price).toBeGreaterThanOrEqual(response.body.items[i].price);
+      }
+      
+      // Verify applied filters remain active (not cleared by sorting)
+      const filteredIds = response.body.items.map((b) => b.id);
+      const unfilteredSorted = handleSearchRequest(seedBooks, {
+        category: 'non-fiction',
+        sort: 'price-high-to-low',
+      });
+      if (unfilteredSorted.status === 200) {
+        // Unfiltered sorted should have more items than filtered sorted
+        expect(unfilteredSorted.body.total).toBeGreaterThan(response.body.total);
+      }
+    }
   });
 });

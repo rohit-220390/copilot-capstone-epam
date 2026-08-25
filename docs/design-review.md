@@ -80,11 +80,80 @@ Reviewed [docs/architecture.md](./architecture.md) ("Feature Design: EPMCDMETST-
 - **Description**: `FilterStatePort.load(category)` returns whatever was previously saved, but the Filter Option Catalog (allowed formats/languages/date windows/ratings) could change between the save and a later refresh (e.g., a catalog config update). Nothing in Section 10 revalidates restored filters against the current allow-list before applying them, which could silently apply a now-invalid filter value.
 - **Recommendation**: When hydrating from `FilterStatePort.load()`, filter the restored selections through `getFilterOptions(category)` and drop any values no longer present in the current catalog, rather than trusting persisted values unconditionally. Server-side allow-list validation (Section 6) still applies as a second line of defense.
 
+### DR-011: Book model requires price field for sorting
+- **Type**: Gap
+- **Severity**: High
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Section 11 requires sorting by price (high-to-low, low-to-high), but DR-002 defined the `Book` interface without a `price` field. The existing `Book` model must be extended.
+- **Recommendation**: Update the `Book` interface defined in DR-002 to include `price: number`. Update seed data to include realistic price values for all books. Ensure existing filter tests remain unaffected (price is not used in filtering, only sorting).
+
+### DR-012: Sort Option Catalog not fully defined
+- **Type**: Gap
+- **Severity**: Medium
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Section 11 lists sorting options but doesn't specify the complete `SortOption` type definition or the `getSortOptions(category)` function signature similar to how filters are cataloged.
+- **Recommendation**: Define explicit `SortOption` type as a union: `'price-high-to-low' | 'price-low-to-high' | 'rating-high-to-low' | 'publication-date-newest' | 'publication-date-oldest' | 'relevance'`. Add `getSortOptions(category): SortOption[]` function in the catalog module, returning identical options for both Fiction and Non-Fiction (parity requirement). Add test confirming `getSortOptions('fiction')` === `getSortOptions('non-fiction')`.
+
+### DR-013: Sorting execution order must be enforced
+- **Type**: Risk
+- **Severity**: High
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Section 11 specifies execution order as Filter → Sort → Paginate (confirmed by product owner), but if implementation doesn't follow this order strictly (e.g., sorting before filtering or paginating before sorting), results will be incorrect. The architecture doesn't specify enforcement mechanisms.
+- **Recommendation**: In `searchBooks()` implementation, structure code to make the execution order explicit and non-invertible: apply all filter predicates first, then sort the filtered array, then slice for pagination. Add integration test verifying that sorting a filtered result set (e.g., Non-Fiction + eBook + price-high-to-low) returns correctly sorted filtered items, not full-catalog sorted items.
+
+### DR-014: Sort parameter validation defaults to 'relevance'
+- **Type**: Decision
+- **Severity**: Low
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Section 11 states unrecognized sort values default to `'relevance'` (graceful degradation). This differs from the filter validation approach (Section 6) where unrecognized optional filter values are silently dropped. The difference is defensible (category is mandatory, sort is optional with a safe default), but should be explicit in implementation.
+- **Recommendation**: Document this distinction in the Search API implementation. Add test case confirming `?sort=invalid-value` returns results in catalog order (relevance/unsorted) without a 400 error, and that the response doesn't indicate an active sort.
+
+### DR-015: Stable sort requirement not testable without tie-breaker
+- **Type**: Risk
+- **Severity**: Low
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Section 11 specifies "stable sort: Books with equal sort-key values maintain their relative catalog order," but JavaScript's `Array.sort()` is guaranteed stable only as of ES2019. If the implementation runs in an older environment or uses a custom sort that's not stable, the requirement could be violated silently.
+- **Recommendation**: Use ES2019+ stable `Array.sort()` (already guaranteed in Node 12+, TypeScript target ES2019+). Add a test with multiple books having identical sort keys (e.g., same price) and verify their relative order matches the catalog order.
+
+### DR-016: Price values in seed data unspecified
+- **Type**: Gap
+- **Severity**: Medium
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Section 11 requires price values in seed data but doesn't specify the range, distribution, or constraints (e.g., positive numbers only, integer or decimal, currency).
+- **Recommendation**: Define seed data price constraints: positive numbers, up to 2 decimal places (standard currency representation), range $5.00-$50.00 (realistic for books). Include at least two books with identical prices (for stable-sort testing per DR-015). Document in `seed-data.json` schema.
+
+### DR-017: Sort state persistence integrated with filter persistence
+- **Type**: Decision
+- **Severity**: Medium
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting, Filter state is preserved after page refresh)
+- **Description**: Section 11 includes `sort` in the `SelectedFilters` object persisted via `FilterStatePort`, reusing the same persistence mechanism as filters. This means "Clear All Filters" also clears the sort (resetting to `'relevance'`). This interpretation is stated in Section 11 but not confirmed by product owner.
+- **Recommendation**: Confirm with product owner that "Clear All Filters" should also reset the sort to default (`'relevance'`), or if sort should persist independently. If confirmed, add test case: apply filters + sort, call clearAll(), verify both filters and sort are cleared. If sort should persist separately, refactor to use separate persistence keys.
+
+### DR-018: Sort selector UI element not defined
+- **Type**: Gap
+- **Severity**: Low
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Similar to DR-009 (Clear All Filters UI), Section 11 mentions "Sort selector rendered as a dropdown/radio group" but doesn't specify the component API or integration with `SearchFiltersPanel`.
+- **Recommendation**: Confirm during planning whether the sort selector is part of `SearchFiltersPanel` (adding a `selectSort(option)` method as stated in Section 11's Component Architecture Changes table) or a separate UI component. If integrated, update the framework-agnostic approach to include sort in the panel's state/rendering contract.
+
+### DR-019: Sorting does not reset page to 1 explicitly stated but not enforced
+- **Type**: Risk
+- **Severity**: Medium
+- **Requirement**: EPMCDMETST-52015 (Scenario: Filtering works with sorting)
+- **Description**: Section 11 states "Changing sort **resets page to 1** (same behavior as changing a filter)" but the architecture doesn't specify where this reset happens (client-side in ResultsView's onChange listener, or explicitly in selectSort()).
+- **Recommendation**: Clarify that the existing `ResultsView.onChange` listener (which already resets page to 1 on any filter change) automatically handles sort changes too, since sort is part of `SelectedFilters`. No additional reset logic needed. Add test confirming page=2 + change sort → results from page=1.
+
 ## Outcome
 
 - **Blocking findings**: None.
-- **High**: DR-001 (resolved), DR-008 — should be resolved before implementation of Clear All Filters.
-- **Medium**: DR-002, DR-003, DR-004, DR-010 — should be resolved/decided during planning before implementation starts.
-- **Low**: DR-005, DR-006, DR-007, DR-009 — address during implementation/test planning.
+- **High**: DR-001 (resolved), DR-008, DR-011, DR-013 — must be resolved before implementation.
+- **Medium**: DR-002, DR-003, DR-004, DR-010, DR-012, DR-016, DR-017, DR-019 — should be resolved/decided during planning before implementation starts.
+- **Low**: DR-005, DR-006, DR-007, DR-009, DR-014, DR-015, DR-018 — address during implementation/test planning.
 
-No blocking issues remain. Architecture (including the new Section 10: Clear All Filters & Filter Persistence) is ready to proceed to **DESIGN_APPROVAL**, pending human sign-off on DR-004 (in-memory storage decision) and DR-008 (persistence-clearing guarantee for Clear All Filters) in particular.
+**Critical decisions requiring human approval before PLAN state:**
+1. **DR-004**: Confirm in-memory catalog storage for capstone scope
+2. **DR-008**: Confirm Clear All Filters clears persisted state via normal onChange path
+3. **DR-011**: Confirm adding `price` field to Book model
+4. **DR-017**: Confirm Clear All Filters also resets sort to 'relevance'
+
+No blocking issues remain. Architecture (including Section 10: Clear All Filters & Filter Persistence, and Section 11: Filtering works with sorting) is ready to proceed to **DESIGN_APPROVAL** gate, pending human sign-off on the critical decisions listed above.
