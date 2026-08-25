@@ -35,8 +35,10 @@ export class ResultsView {
     private readonly persistence?: FilterStatePort,
   ) {
     this.panel.onChange((filters) => {
+      console.log('ResultsView onChange handler called with:', filters);
       this.persistence?.save(this.panel.getCategory(), filters);
       this.page = 1;
+      console.log('About to refresh with filters:', filters);
       void this.refresh();
     });
 
