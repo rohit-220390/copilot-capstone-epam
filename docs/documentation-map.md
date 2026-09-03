@@ -35,5 +35,24 @@ Mapping between source requirements and repository artifacts.
 | EPMCDMETST-52015 | Jira | `bookstore-app/tests/acceptance/non-fiction-filters.test.ts` | test-impacting |
 | EPMCDMETST-52015 | Jira | `bookstore-app/tests/api/app-server.test.ts` | test-impacting |
 <!-- Maintained by the Documentation Agent -->
-<!-- Last synchronized: added browser UI (public/, src/web/browser-app.ts), static+API app-server.ts, and JSON-sourced seed data (seed-data.json) -->
+<!-- Last synchronized: 2026-08-25 - Added sorting support (price field, sort options catalog, sort query builder logic) per "Scenario: Filtering works with sorting" -->
+
+## Change Summary for EPMCDMETST-52015
+
+### Initial Implementation (Filtering + Clear All + Persistence)
+- Non-Fiction search filters with Fiction parity (6 scenarios)
+- Clear All Filters functionality
+- Filter state persistence across page refresh
+
+### Delta: Sorting Integration (Current)
+- **New Scenario**: "Filtering works with sorting"
+- **Modified**: `Book` model extended with `price` field
+- **Modified**: `filter-catalog.ts` - added `SortOption` type and `getSortOptions()`
+- **Modified**: `query-builder.ts` - added sorting logic (Filter → Sort → Paginate)
+- **Modified**: `validate-filters.ts` - added sort parameter validation
+- **Modified**: `seed-data.json` - added price values ($5-$50 range, includes duplicates for stable-sort testing)
+- **Modified**: All affected components to support sort state in `SelectedFilters`
+
+### Execution Order
+Per approved architecture (DR-013): **Filter → Sort → Paginate**
 

@@ -1,4 +1,4 @@
-import { getFilterOptions } from '../../src/catalog/filter-catalog.js';
+import { getFilterOptions, getSortOptions } from '../../src/catalog/filter-catalog.js';
 
 describe('getFilterOptions', () => {
   it('returns identical filter groups/options for fiction and non-fiction (parity requirement)', () => {
@@ -11,5 +11,23 @@ describe('getFilterOptions', () => {
     expect(options.language).toEqual(['english', 'spanish', 'french', 'german']);
     expect(options.publicationDate).toEqual(['last-30-days', 'last-6-months', 'last-year']);
     expect(options.minRating).toEqual([3, 4]);
+  });
+});
+
+describe('getSortOptions', () => {
+  it('returns identical sort options for fiction and non-fiction (parity requirement)', () => {
+    expect(getSortOptions('fiction')).toEqual(getSortOptions('non-fiction'));
+  });
+
+  it('includes all six required sort options', () => {
+    const options = getSortOptions('fiction');
+    expect(options).toEqual([
+      'price-high-to-low',
+      'price-low-to-high',
+      'rating-high-to-low',
+      'publication-date-newest',
+      'publication-date-oldest',
+      'relevance',
+    ]);
   });
 });

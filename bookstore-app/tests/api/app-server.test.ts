@@ -3,7 +3,7 @@ import type { Book } from '../../src/catalog/book.js';
 import { createAppServer } from '../../src/api/app-server.js';
 
 const catalog: Book[] = [
-  { id: '1', title: 'Non-Fiction Hardcover EN', category: 'non-fiction', format: 'hardcover', language: 'english', publicationDate: '2026-01-01T00:00:00.000Z', averageRating: 4.5 },
+  { id: '1', title: 'Non-Fiction Hardcover EN', category: 'non-fiction', format: 'hardcover', language: 'english', publicationDate: '2026-01-01T00:00:00.000Z', averageRating: 4.5, price: 29.99 },
 ];
 
 describe('createAppServer', () => {

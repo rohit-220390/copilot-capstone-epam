@@ -4,11 +4,11 @@ import { parsePagination, searchBooks } from '../../src/search/query-builder.js'
 const NOW = new Date('2026-06-15T00:00:00.000Z');
 
 const catalog: Book[] = [
-  { id: '1', title: 'Fiction Hardcover EN Recent', category: 'fiction', format: 'hardcover', language: 'english', publicationDate: '2026-06-01T00:00:00.000Z', averageRating: 4.5 },
-  { id: '2', title: 'Fiction Paperback ES Old', category: 'fiction', format: 'paperback', language: 'spanish', publicationDate: '2020-01-01T00:00:00.000Z', averageRating: 3.0 },
-  { id: '3', title: 'Non-Fiction Hardcover EN Recent', category: 'non-fiction', format: 'hardcover', language: 'english', publicationDate: '2026-06-01T00:00:00.000Z', averageRating: 4.8 },
-  { id: '4', title: 'Non-Fiction Ebook FR Old Low Rating', category: 'non-fiction', format: 'ebook', language: 'french', publicationDate: '2020-01-01T00:00:00.000Z', averageRating: 2.0 },
-  { id: '5', title: 'Non-Fiction Hardcover EN Recent Low Rating', category: 'non-fiction', format: 'hardcover', language: 'english', publicationDate: '2026-06-02T00:00:00.000Z', averageRating: 3.2 },
+  { id: '1', title: 'Fiction Hardcover EN Recent', category: 'fiction', format: 'hardcover', language: 'english', publicationDate: '2026-06-01T00:00:00.000Z', averageRating: 4.5, price: 24.99 },
+  { id: '2', title: 'Fiction Paperback ES Old', category: 'fiction', format: 'paperback', language: 'spanish', publicationDate: '2020-01-01T00:00:00.000Z', averageRating: 3.0, price: 14.99 },
+  { id: '3', title: 'Non-Fiction Hardcover EN Recent', category: 'non-fiction', format: 'hardcover', language: 'english', publicationDate: '2026-06-01T00:00:00.000Z', averageRating: 4.8, price: 34.99 },
+  { id: '4', title: 'Non-Fiction Ebook FR Old Low Rating', category: 'non-fiction', format: 'ebook', language: 'french', publicationDate: '2020-01-01T00:00:00.000Z', averageRating: 2.0, price: 9.99 },
+  { id: '5', title: 'Non-Fiction Hardcover EN Recent Low Rating', category: 'non-fiction', format: 'hardcover', language: 'english', publicationDate: '2026-06-02T00:00:00.000Z', averageRating: 3.2, price: 29.99 },
 ];
 
 describe('parsePagination', () => {
