@@ -48,6 +48,7 @@ export class SearchFiltersPanel {
 
   private emitChange(): void {
     const snapshot = { ...this.selected };
+    console.log('emitChange: notifying', this.listeners.length, 'listeners with:', snapshot);
     for (const listener of this.listeners) listener(snapshot);
   }
 
@@ -75,7 +76,9 @@ export class SearchFiltersPanel {
 
   /** Selects a sort option; emits through the same onChange path as filter selections. */
   selectSort(option: SortOption): void {
+    console.log('selectSort called with:', option);
     this.selected.sort = option;
+    console.log('About to emit change, selected:', this.selected);
     this.emitChange();
   }
 

@@ -1,5 +1,5 @@
 import type { BookCategory, BookFormat, BookLanguage } from '../catalog/book.js';
-import type { MinRating, PublicationDateWindow } from '../catalog/filter-catalog.js';
+import type { MinRating, PublicationDateWindow, SortOption } from '../catalog/filter-catalog.js';
 import { SearchFiltersPanel } from './search-filters-panel.js';
 import { ResultsView, type SearchFn, type SearchResultPage } from './results-view.js';
 import { LocalStorageFilterPersistence } from './filter-state-persistence.js';
@@ -27,6 +27,7 @@ const searchViaApi: SearchFn = async (category, filters, page) => {
   if (filters.language) params.set('language', filters.language);
   if (filters.publicationDate) params.set('publicationDate', filters.publicationDate);
   if (filters.minRating !== undefined) params.set('minRating', String(filters.minRating));
+  if (filters.sort) params.set('sort', filters.sort);
 
   const res = await fetch(`/api/search?${params.toString()}`);
   if (!res.ok) {
@@ -81,6 +82,50 @@ function renderStars(
   return wrapper;
 }
 
+function renderSortDropdown(
+  label: string,
+  options: readonly SortOption[],
+  active: SortOption | undefined,
+  onSelect: (value: SortOption) => void,
+): HTMLElement {
+  const wrapper = document.createElement('fieldset');
+  const legend = document.createElement('legend');
+  legend.textContent = label;
+  wrapper.appendChild(legend);
+
+  const select = document.createElement('select');
+  select.className = 'sort-dropdown';
+  
+  // Add default option
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = '-- Select Sort Option --';
+  defaultOption.selected = !active;
+  select.appendChild(defaultOption);
+
+  // Add sort options
+  for (const option of options) {
+    const optionEl = document.createElement('option');
+    optionEl.value = option;
+    optionEl.textContent = option;
+    optionEl.selected = option === active;
+    select.appendChild(optionEl);
+  }
+
+  select.addEventListener('change', (e) => {
+    const target = e.target as HTMLSelectElement;
+    const value = target.value;
+    console.log('Sort dropdown changed:', value);
+    if (value && value !== '') {
+      console.log('Calling onSelect with:', value);
+      onSelect(value as SortOption);
+    }
+  });
+
+  wrapper.appendChild(select);
+  return wrapper;
+}
+
 
 let panel: SearchFiltersPanel;
 let view: ResultsView;
@@ -102,6 +147,12 @@ function render(): void {
     ),
   );
   filtersEl.appendChild(renderStars(options.minRating, selected.minRating, (value) => panel.clickStar(value)));
+  filtersEl.appendChild(
+    renderSortDropdown('Sort By', panel.getSortOptions(), selected.sort, (value) => {
+      console.log('Sort callback invoked with:', value);
+      panel.selectSort(value);
+    }),
+  );
 
   const error = view.getError();
   errorEl.hidden = !error;
@@ -112,10 +163,12 @@ function render(): void {
   resultsEl.innerHTML = '';
   for (const book of view.getItems()) {
     const li = document.createElement('li');
-    li.textContent = `${book.title} \u2014 ${book.format}, ${book.language}, \u2605${book.averageRating.toFixed(1)}`;
+    li.textContent = `${book.title} \u2014 ${book.format}, ${book.language}, \u2605${book.averageRating.toFixed(1)}, $${book.price.toFixed(2)}`;
     resultsEl.appendChild(li);
   }
 }
+
+let isInitialLoad = true;
 
 async function selectCategory(category: BookCategory): Promise<void> {
   for (const tab of tabsEl.querySelectorAll<HTMLButtonElement>('button')) {
@@ -123,7 +176,9 @@ async function selectCategory(category: BookCategory): Promise<void> {
   }
 
   panel = new SearchFiltersPanel(category);
-  view = new ResultsView(panel, searchViaApi, persistence);
+  // Only use persistence on initial page load, not when switching tabs
+  view = new ResultsView(panel, searchViaApi, isInitialLoad ? persistence : undefined);
+  isInitialLoad = false;
   view.onUpdate(render);
   clearAllButton.onclick = () => view.clearFilters();
 
