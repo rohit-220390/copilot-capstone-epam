@@ -1,10 +1,13 @@
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const HOOKS_DIR = join(process.cwd(), 'src', 'security', 'hooks');
 
-function runHook(scriptName: string, input: unknown): Record<string, unknown> {
+function runHook(scriptName: string, input: unknown, cwd = process.cwd()): Record<string, unknown> {
   const output = execFileSync('node', [join(HOOKS_DIR, scriptName)], {
+    cwd,
     input: JSON.stringify(input),
     encoding: 'utf-8',
   });
@@ -64,8 +67,13 @@ describe('agent-stop hook', () => {
 
 describe('subagent-stop hook', () => {
   it('blocks the pr agent when docs/changelog.md has no dated entry', () => {
-    const result = runHook('subagent-stop.mjs', { agentName: 'pr', response: 'done' });
-    expect(result.decision).toBe('block');
+    const fixtureDir = mkdtempSync(join(tmpdir(), 'subagent-stop-hook-'));
+    try {
+      const result = runHook('subagent-stop.mjs', { agentName: 'pr', response: 'done' }, fixtureDir);
+      expect(result.decision).toBe('block');
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
   });
 
   it('allows non-pr subagents to complete when no secrets are present', () => {
